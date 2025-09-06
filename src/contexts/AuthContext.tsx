@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '@/lib/api';
+import { ProductDetailSkeleton } from '@/components/ProductDetailSkeleton'; // Import skeleton
 
 interface User {
   id: number;
@@ -54,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
-      {!isLoading && children}
+      {isLoading ? <ProductDetailSkeleton /> : children}
     </AuthContext.Provider>
   );
 };

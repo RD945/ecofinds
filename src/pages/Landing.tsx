@@ -5,16 +5,23 @@ import { CategoryFilter } from "@/components/CategoryFilter";
 import heroImage from "@/assets/hero-image.jpg";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ServerCrash, RefreshCw } from "lucide-react";
+import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
 
+
+interface ProductImage {
+    id: number;
+    url: string | null;
+}
 
 interface Product {
   id: number;
   title: string;
   price: string;
   category: { name: string };
-  image_url: string | null;
+  images: ProductImage[];
 }
 
 const categories = ["kitchen", "accessories", "electronics", "personal care", "home", "clothing"];
@@ -25,24 +32,34 @@ export const Landing = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [cartCount, setCartCount] = useState(0); // Mock cart count
+  const [cartCount, setCartCount] = useState(0); 
+  const [serverError, setServerError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    setServerError(false);
+    try {
+      const params = new URLSearchParams();
+      if (selectedCategory !== 'all') {
+        params.append('category', selectedCategory);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      const { data } = await api.get(`/products?${params.toString()}`);
+      setProducts(data);
+    } catch (error: any) {
+      console.error("Failed to fetch products:", error);
+      if (error.code === 'ERR_NETWORK') {
+        setServerError(true);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (selectedCategory !== 'all') {
-          params.append('category', selectedCategory);
-        }
-        if (searchQuery) {
-          params.append('search', searchQuery);
-        }
-        const { data } = await api.get(`/products?${params.toString()}`);
-        setProducts(data);
-      } catch (error) {
-        console.error("Failed to fetch products:", error);
-      }
-    };
     fetchProducts();
   }, [searchQuery, selectedCategory]);
 
@@ -63,17 +80,23 @@ export const Landing = () => {
   }, [user]);
 
   const handleAddToCart = async (productId: number) => {
+    if (!user) {
+        navigate('/auth');
+        return;
+    }
     try {
         await api.post('/cart', { productId, quantity: 1});
         // A toast notification would be better here.
         alert('Product added to cart!');
         // Refetch cart to update count
-         if (user) {
-            const { data } = await api.get('/cart');
-            setCartCount(data.reduce((sum: number, item: any) => sum + item.quantity, 0));
-        }
+        const { data } = await api.get('/cart');
+        setCartCount(data.reduce((sum: number, item: any) => sum + item.quantity, 0));
     } catch (error) {
         console.error("Failed to add to cart", error);
+        // We could also check for 401 here as a fallback
+        if ((error as any).response?.status === 401) {
+            navigate('/auth');
+        }
     }
   };
 
@@ -88,7 +111,7 @@ export const Landing = () => {
       />
 
       {/* Hero Section */}
-      {!searchQuery && selectedCategory === "all" && (
+      {!searchQuery && !serverError && (
         <section className="relative bg-gradient-to-b from-accent/30 to-background">
           <div className="container mx-auto px-4 py-12">
             <div className="grid lg:grid-cols-2 gap-8 items-center">
@@ -105,13 +128,14 @@ export const Landing = () => {
                 </p>
                 <div className="flex gap-4">
                   <Button 
-                    className="btn-eco"
-                    onClick={() => navigate('/signup')}
+                    size="lg"
+                    onClick={() => navigate('/auth?mode=signup')}
                   >
                     Start Shopping
                   </Button>
                   <Button 
-                    className="btn-eco-outline"
+                    size="lg"
+                    variant="outline"
                     onClick={() => navigate('/add-product')}
                   >
                     Sell Your Items
@@ -130,26 +154,39 @@ export const Landing = () => {
         </section>
       )}
 
-      <CategoryFilter
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
+      {!serverError && (
+        <CategoryFilter
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+        />
+      )}
 
-      {/* Products Grid */}
+      {/* Products Grid / Error States */}
       <main className="container mx-auto px-4 py-8">
-        {searchQuery && (
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-foreground">
-              Search results for "{searchQuery}"
-            </h2>
-            <p className="text-muted-foreground">
-              {filteredProducts.length} products found
-            </p>
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+                <ProductCardSkeleton key={index} />
+            ))}
           </div>
-        )}
-
-        {filteredProducts.length === 0 ? (
+        ) : serverError ? (
+          <div className="text-center py-12">
+            <div className="w-32 h-32 bg-destructive/10 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <ServerCrash className="w-16 h-16 text-destructive" />
+            </div>
+            <h3 className="text-xl font-semibold text-destructive mb-2">
+              Server is Offline
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              We couldn't connect to the server. Please make sure the backend is running.
+            </p>
+            <Button onClick={fetchProducts}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        ) : products.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-32 h-32 bg-accent rounded-full mx-auto mb-4 flex items-center justify-center">
               <span className="text-4xl">🌱</span>
@@ -163,14 +200,14 @@ export const Landing = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <ProductCard
                 key={product.id}
                 id={product.id}
                 title={product.title}
                 price={product.price}
                 category={product.category.name}
-                image={product.image_url}
+                image={product.images && product.images.length > 0 ? product.images[0] : null}
                 onAddToCart={() => handleAddToCart(product.id)}
               />
             ))}

@@ -1,15 +1,15 @@
-import { Card, CardContent } from "./ui/card";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ShoppingCart } from "lucide-react";
-
+import { Card, CardContent } from "./ui/card";
+import { ImageWithFade } from "./ImageWithFade";
 
 interface ProductCardProps {
   id: number;
   title: string;
   price: string;
   category: string;
-  image: string | null;
+  image: { id: number, url?: string | null } | string | null;
   showActions?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -36,19 +36,26 @@ export const ProductCard = ({
         }
         navigate(`/products/${id}`);
     }
+    
+    const imageUrl = typeof image === 'string' 
+        ? image 
+        : image?.url 
+        ? image.url 
+        : image?.id 
+        ? `http://localhost:5000/api/images/${image.id}` 
+        : 'https://placehold.co/600x400';
 
   return (
     <Card 
         className="card-eco group cursor-pointer overflow-hidden" 
         onClick={handleCardClick}
     >
-        <div className="aspect-[4/3] bg-accent overflow-hidden">
-          <img 
-            src={image || 'https://placehold.co/600x400'} 
-            alt={title} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-            />
-        </div>
+      <ImageWithFade
+        src={imageUrl}
+        alt={title}
+        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+        wrapperClassName="aspect-[4/3] bg-accent p-2"
+      />
       <CardContent className="p-4 space-y-2">
         <p className="text-sm text-muted-foreground capitalize">{category}</p>
         <h3 className="font-semibold text-lg truncate group-hover:text-primary">{title}</h3>

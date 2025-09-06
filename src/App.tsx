@@ -11,6 +11,9 @@ import { Cart } from "./pages/Cart";
 import { AddProduct } from "./pages/AddProduct";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ProductDetail } from "./pages/ProductDetail";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
+import { EditProduct } from "./pages/EditProduct";
 
 const queryClient = new QueryClient();
 
@@ -23,12 +26,14 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/products/:id" element={<ProductDetail />} />
-          <Route path="/login" element={<Auth mode="login" />} />
-          <Route path="/signup" element={<Auth mode="signup" />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/add-product" element={<AddProduct />} />
+            <Route path="/edit-product/:id" element={<EditProduct />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

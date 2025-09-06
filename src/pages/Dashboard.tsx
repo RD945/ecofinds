@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, User, Package, ShoppingBag } from "lucide-react";
+import { ArrowLeft, User, Package, ShoppingBag, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,10 +7,12 @@ import { ProductCard } from "@/components/ProductCard";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { useNavigate } from "react-router-dom";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
-interface DashboardProps {
-  onNavigate: (page: string) => void;
-  currentUser?: any;
+interface ProductImage {
+    id: number;
+    url: string | null;
 }
 
 interface Product {
@@ -18,7 +20,7 @@ interface Product {
   title: string;
   price: string;
   category: { name: string };
-  image_url: string | null;
+  images: ProductImage[];
   seller_id: number;
 }
 
@@ -42,6 +44,7 @@ export const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("listings");
   const [userListings, setUserListings] = useState<Product[]>([]);
   const [userPurchases, setUserPurchases] = useState<Order[]>([]);
+  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -53,6 +56,11 @@ export const Dashboard = () => {
             const { data: orders } = await api.get('/orders/history');
             setUserPurchases(orders);
 
+            // You would typically fetch this as part of the initial user object
+            // For now, a separate fetch is fine for demonstration.
+            const { data: userData } = await api.get('/auth/me');
+            setIsTwoFactorEnabled(userData.two_factor_enabled);
+
         } catch (error) {
             console.error("Failed to fetch dashboard data:", error);
         }
@@ -62,9 +70,19 @@ export const Dashboard = () => {
   }, [user]);
 
 
-  const handleEditProduct = (productId: string) => {
-    console.log("Edit product:", productId);
-    // In a real app, would navigate to edit form
+  const handleToggleTwoFactor = async (enabled: boolean) => {
+      try {
+          await api.post('/auth/2fa/status', { enabled });
+          setIsTwoFactorEnabled(enabled);
+          // You might want to show a success toast here
+      } catch (error) {
+          console.error("Failed to update 2FA status:", error);
+          // Show an error toast
+      }
+  };
+
+  const handleEditProduct = (productId: number) => {
+    navigate(`/edit-product/${productId}`);
   };
 
   const handleDeleteProduct = async (productId: number) => {
@@ -174,7 +192,7 @@ export const Dashboard = () => {
           {/* Main Content */}
           <div className="lg:col-span-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="listings" className="flex items-center gap-2">
                   <Package className="w-4 h-4" />
                   My Listings
@@ -182,6 +200,10 @@ export const Dashboard = () => {
                 <TabsTrigger value="purchases" className="flex items-center gap-2">
                   <ShoppingBag className="w-4 h-4" />
                   My Purchases
+                </TabsTrigger>
+                 <TabsTrigger value="security" className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Security
                 </TabsTrigger>
               </TabsList>
 
@@ -223,14 +245,14 @@ export const Dashboard = () => {
                     {userListings.map((product) => (
                       <ProductCard
                         key={product.id}
+                        id={product.id}
                         title={product.title}
                         price={product.price}
                         category={product.category.name}
-                        image={product.image_url}
+                        image={product.images && product.images.length > 0 ? product.images[0] : null}
                         showActions={true}
-                        onEdit={() => handleEditProduct(String(product.id))}
+                        onEdit={() => handleEditProduct(product.id)}
                         onDelete={() => handleDeleteProduct(product.id)}
-                        onClick={() => console.log("View product", product.id)}
                       />
                     ))}
                   </div>
@@ -296,6 +318,36 @@ export const Dashboard = () => {
                     ))}
                   </div>
                 )}
+              </TabsContent>
+
+              {/* Security Tab */}
+              <TabsContent value="security" className="space-y-6">
+                 <div>
+                    <h2 className="text-2xl font-semibold">Security Settings</h2>
+                    <p className="text-muted-foreground">
+                        Manage your account's security settings
+                    </p>
+                </div>
+                 <Card className="card-eco">
+                    <CardHeader>
+                        <CardTitle>Two-Factor Authentication (2FA)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground mb-4">
+                            Protect your account with an extra layer of security. When enabled, you will be required to enter a one-time code sent to your email during login.
+                        </p>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="2fa-switch"
+                                checked={isTwoFactorEnabled}
+                                onCheckedChange={handleToggleTwoFactor}
+                            />
+                            <Label htmlFor="2fa-switch">
+                                {isTwoFactorEnabled ? "2FA Enabled" : "2FA Disabled"}
+                            </Label>
+                        </div>
+                    </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

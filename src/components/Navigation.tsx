@@ -1,6 +1,8 @@
-import { Search, ShoppingCart, CircleUser } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { ShoppingCart, UserCircle, Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,9 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/contexts/AuthContext";
-import { Badge } from "@/components/ui/badge";
-import { Link, useNavigate } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface NavigationProps {
   searchQuery: string;
@@ -19,29 +19,20 @@ interface NavigationProps {
   cartCount: number;
 }
 
-export const Navigation = ({
-  searchQuery,
-  onSearchChange,
-  cartCount,
-}: NavigationProps) => {
+export const Navigation = ({ searchQuery, onSearchChange, cartCount }: NavigationProps) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl">🌱</span>
-            <span className="font-bold text-lg hidden sm:inline-block">
-              EcoFinds
-            </span>
-          </Link>
+    <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <a href="/" className="text-xl font-bold text-primary">
+            EcoFinds
+          </a>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 flex justify-center px-4 lg:px-8">
+        <div className="flex-1 flex justify-center">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
@@ -54,43 +45,46 @@ export const Navigation = ({
           </div>
         </div>
 
-        {/* Actions */}
-        <nav className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            className="relative p-0 h-10 w-10 rounded-full"
-            onClick={() => navigate("/cart")}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {cartCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full p-0">
-                {cartCount}
-                </Badge>
-            )}
-            <span className="sr-only">Cart</span>
-          </Button>
+        <div className="flex items-center gap-2">
           {user ? (
-             <DropdownMenu>
+            <>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/cart')}>
+                <div className="relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
+                </div>
+              </Button>
+              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" size="icon" className="rounded-full h-10 w-10">
-                    <CircleUser className="h-6 w-6" />
-                    <span className="sr-only">Toggle user menu</span>
+                  <Button variant="ghost" size="icon">
+                    <UserCircle className="w-6 h-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/dashboard')}>Dashboard</DropdownMenuItem>
-                  <DropdownMenuItem>Support</DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : (
-              <Button onClick={() => navigate("/login")}>Sign In</Button>
-            )}
-        </nav>
+            </>
+          ) : (
+            <Tabs 
+              onValueChange={(value) => navigate(`/auth?mode=${value}`)}
+              className="w-[200px]"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+        </div>
       </div>
-    </header>
+    </nav>
   );
 };
