@@ -1,6 +1,6 @@
-# Earth Trunk Shop - UI Prototype
+# EcoFinds - Sustainable Second-Hand Marketplace - UI Prototype
 
-This project is a UI prototype for an e-commerce application called "Earth Trunk Shop," which focuses on eco-friendly and sustainable products. This README provides an overview of the user interface and its features.
+This project is a UI prototype for an e-commerce application called "EcoFinds - Sustainable Second-Hand Marketplace," which focuses on eco-friendly and sustainable products. This README provides an overview of the user interface and its features.
 
 **Important Note:** This is a prototype version. The UI is built with static data and does not have a functional backend. Future versions will integrate with a proper backend to provide full functionality, including user authentication, product management, and order processing.
 
