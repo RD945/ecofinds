@@ -9,7 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get('/', getProducts);
 router.get('/:id', getProductById);
 router.post('/', protect, upload.array('images', 5), createProduct);
-router.put('/:id', protect, updateProduct);
+router.put('/:id', protect, upload.fields([{ name: 'images', maxCount: 5 }]), updateProduct);
 router.delete('/:id', protect, deleteProduct);
 
 export default router;

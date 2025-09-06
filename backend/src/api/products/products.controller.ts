@@ -110,37 +110,98 @@ const productUpdateSchema = z.object({
   dimension_l: z.coerce.number().optional().nullable(),
   dimension_w: z.coerce.number().optional().nullable(),
   dimension_h: z.coerce.number().optional().nullable(),
-  is_original: z.boolean().optional(),
-  has_manual: z.boolean().optional(),
+  is_original: z.coerce.boolean().optional(),
+  has_manual: z.coerce.boolean().optional(),
   working_condition: z.string().optional().nullable(),
-  existingImages: z.array(z.object({ id: z.string(), url: z.string() })).optional(),
 });
 
+// Robust updateProduct controller: handles multipart/form-data and JSON safely
 export async function updateProduct(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  try {
-    const parsedBody = {
-      ...req.body,
-      price: req.body.price ? parseFloat(req.body.price) : undefined,
-      category_id: req.body.category_id ? parseInt(req.body.category_id, 10) : undefined,
-      quantity: req.body.quantity ? parseInt(req.body.quantity, 10) : undefined,
-      year_of_manufacture: req.body.year_of_manufacture ? parseInt(req.body.year_of_manufacture, 10) : undefined,
-      dimension_l: req.body.dimension_l ? parseFloat(req.body.dimension_l) : undefined,
-      dimension_w: req.body.dimension_w ? parseFloat(req.body.dimension_w) : undefined,
-      dimension_h: req.body.dimension_h ? parseFloat(req.body.dimension_h) : undefined,
-      is_original: req.body.is_original === 'true',
-      has_manual: req.body.has_manual === 'true',
-    };
 
-    const productData = productUpdateSchema.parse(parsedBody);
-    const product = await productService.updateProduct(Number(id), productData, req.user!.id, req.files as Express.Multer.File[]);
-    res.json(product);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Invalid input", errors: error.issues });
+  try {
+    // Defensive: ensure body is always an object
+    const body = req.body ?? {};
+
+    // Dev logs (safe length)
+    console.log('[updateProduct] Content-Type:', req.headers['content-type']);
+    console.log('[updateProduct] body keys:', Object.keys(body));
+    console.log('[updateProduct] files present:', !!req.files);
+
+    // Normalize existingImageIds: accept existingImageIds OR existingImages for compatibility
+    let existingImageIdsRaw: any = body.existingImageIds ?? body.existingImages ?? [];
+
+    // If it's a JSON string like '["1","2"]', try to parse it
+    if (typeof existingImageIdsRaw === 'string' && existingImageIdsRaw.trim().startsWith('[')) {
+      try {
+        existingImageIdsRaw = JSON.parse(existingImageIdsRaw);
+      } catch (e) {
+        // leave as-is (will be wrapped below)
+      }
     }
-    res.status(500).json({ message: "Internal server error" });
+
+    // If it's a single string id, wrap in array
+    if (!Array.isArray(existingImageIdsRaw)) {
+      if (existingImageIdsRaw === undefined || existingImageIdsRaw === null || existingImageIdsRaw === '') {
+        existingImageIdsRaw = [];
+      } else {
+        existingImageIdsRaw = [existingImageIdsRaw];
+      }
+    }
+
+    // Convert to number[] and filter invalid entries
+    const imageIds: number[] = (existingImageIdsRaw as any[])
+      .map((s) => {
+        const n = Number(s);
+        return Number.isNaN(n) ? null : n;
+      })
+      .filter((n): n is number => n !== null);
+
+    // Files from multer (route must use upload.fields([{ name: 'images', maxCount: 5 }]))
+    const files = (req.files as any)?.images ?? [];
+
+    // Build parsed object only from provided fields (coerce strings to numbers/booleans where needed)
+    const parsedBody: Record<string, any> = {};
+    if (body.title !== undefined) parsedBody.title = body.title;
+    if (body.description !== undefined) parsedBody.description = body.description;
+    if (body.price !== undefined && body.price !== '') parsedBody.price = parseFloat(String(body.price));
+    if (body.category_id !== undefined && body.category_id !== '') parsedBody.category_id = parseInt(String(body.category_id), 10);
+    if (body.quantity !== undefined && body.quantity !== '') parsedBody.quantity = parseInt(String(body.quantity), 10);
+    if (body.condition !== undefined) parsedBody.condition = body.condition;
+    if (body.brand !== undefined) parsedBody.brand = body.brand === '' ? null : body.brand;
+    if (body.model !== undefined) parsedBody.model = body.model === '' ? null : body.model;
+    if (body.year_of_manufacture !== undefined && body.year_of_manufacture !== '') parsedBody.year_of_manufacture = parseInt(String(body.year_of_manufacture), 10);
+    if (body.material !== undefined) parsedBody.material = body.material === '' ? null : body.material;
+    if (body.color !== undefined) parsedBody.color = body.color === '' ? null : body.color;
+    if (body.dimension_l !== undefined && body.dimension_l !== '') parsedBody.dimension_l = parseFloat(String(body.dimension_l));
+    if (body.dimension_w !== undefined && body.dimension_w !== '') parsedBody.dimension_w = parseFloat(String(body.dimension_w));
+    if (body.dimension_h !== undefined && body.dimension_h !== '') parsedBody.dimension_h = parseFloat(String(body.dimension_h));
+    if (body.is_original !== undefined) parsedBody.is_original = (String(body.is_original) === 'true' || body.is_original === true);
+    if (body.has_manual !== undefined) parsedBody.has_manual = (String(body.has_manual) === 'true' || body.has_manual === true);
+    if (body.working_condition !== undefined) parsedBody.working_condition = body.working_condition === '' ? null : body.working_condition;
+
+    // Validate using existing zod schema (productUpdateSchema)
+    const productData = productUpdateSchema.parse(parsedBody);
+
+    // Call service with normalized files and image ids
+    const updated = await productService.updateProduct(
+      Number(id),
+      req.user!.id,
+      productData,
+      files as Express.Multer.File[],
+      imageIds
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error('[updateProduct] Error:', err);
+
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid input', errors: err.issues });
+    }
+
+    // In development you can return err.message for faster debugging; in production keep generic
+    return res.status(500).json({ message: 'Internal server error' });
   }
 }
 

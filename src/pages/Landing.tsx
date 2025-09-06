@@ -7,8 +7,9 @@ import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ServerCrash, RefreshCw } from "lucide-react";
+import { ServerCrash, RefreshCw, LayoutDashboard } from "lucide-react";
 import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
+import { toast } from "@/components/ui/sonner";
 
 
 interface ProductImage {
@@ -22,6 +23,7 @@ interface Product {
   price: string;
   category: { name: string };
   images: ProductImage[];
+  seller: { id: number; username: string };
 }
 
 const categories = ["kitchen", "accessories", "electronics", "personal care", "home", "clothing"];
@@ -35,6 +37,7 @@ export const Landing = () => {
   const [cartCount, setCartCount] = useState(0); 
   const [serverError, setServerError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingProductId, setLoadingProductId] = useState<number | null>(null);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -85,18 +88,45 @@ export const Landing = () => {
         return;
     }
     try {
+        // Add to cart first (fast operation)
         await api.post('/cart', { productId, quantity: 1});
-        // A toast notification would be better here.
-        alert('Product added to cart!');
-        // Refetch cart to update count
+        
+        // Update cart count immediately
         const { data } = await api.get('/cart');
         setCartCount(data.reduce((sum: number, item: any) => sum + item.quantity, 0));
+        
+        // No notification for add to cart as requested by user
+        
+        // Send email notification in background (don't wait for it)
+        const product = products.find(p => p.id === productId);
+        if (product && user.email) {
+            // Fire and forget - don't await this
+            api.post('/auth/send-cart-notification', {
+                email: user.email,
+                productName: product.title,
+                productPrice: product.price,
+            }).catch(emailError => {
+                console.error("Failed to send cart notification email:", emailError);
+                // Email failure doesn't affect user experience
+            });
+        }
+        
     } catch (error) {
         console.error("Failed to add to cart", error);
-        // We could also check for 401 here as a fallback
         if ((error as any).response?.status === 401) {
             navigate('/auth');
         }
+    }
+  };
+
+  const handleCardClick = async (productId: number) => {
+    setLoadingProductId(productId);
+    try {
+      // Small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 300));
+      navigate(`/products/${productId}`);
+    } finally {
+      setLoadingProductId(null);
     }
   };
 
@@ -127,19 +157,40 @@ export const Landing = () => {
                   Find unique, sustainable products that make a difference.
                 </p>
                 <div className="flex gap-4">
-                  <Button 
-                    size="lg"
-                    onClick={() => navigate('/auth?mode=signup')}
-                  >
-                    Start Shopping
-                  </Button>
-                  <Button 
-                    size="lg"
-                    variant="outline"
-                    onClick={() => navigate('/add-product')}
-                  >
-                    Sell Your Items
-                  </Button>
+                  {!user ? (
+                    <>
+                      <Button 
+                        size="lg"
+                        onClick={() => navigate('/auth?mode=signup')}
+                      >
+                        Start Shopping
+                      </Button>
+                      <Button 
+                        size="lg"
+                        variant="outline"
+                        onClick={() => navigate('/add-product')}
+                      >
+                        Sell Your Items
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button 
+                        size="lg"
+                        onClick={() => navigate('/add-product')}
+                      >
+                        Sell Your Items
+                      </Button>
+                      <Button 
+                        size="lg"
+                        variant="outline"
+                        onClick={() => navigate('/dashboard')}
+                      >
+                        <LayoutDashboard className="w-5 h-5 mr-2" />
+                        My Dashboard
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="order-first lg:order-last">
@@ -208,7 +259,10 @@ export const Landing = () => {
                 price={product.price}
                 category={product.category.name}
                 image={product.images && product.images.length > 0 ? product.images[0] : null}
+                sellerId={product.seller.id}
+                isLoading={loadingProductId === product.id}
                 onAddToCart={() => handleAddToCart(product.id)}
+                onCardClick={handleCardClick}
               />
             ))}
           </div>

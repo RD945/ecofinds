@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { ShoppingCart, UserCircle, Search } from "lucide-react";
+import { ShoppingCart, UserCircle, Search, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -48,7 +48,10 @@ export const Navigation = ({ searchQuery, onSearchChange, cartCount }: Navigatio
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <Button variant="ghost" size="icon" onClick={() => navigate('/cart')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} title="Dashboard">
+                <LayoutDashboard className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/cart')} title="Shopping Cart">
                 <div className="relative">
                   <ShoppingCart className="w-5 h-5" />
                   {cartCount > 0 && (

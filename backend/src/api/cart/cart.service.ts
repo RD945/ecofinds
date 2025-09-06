@@ -5,7 +5,13 @@ const prisma = new PrismaClient();
 export async function getCart(userId: number) {
   return prisma.cartItem.findMany({
     where: { user_id: userId },
-    include: { product: true },
+    include: { 
+      product: {
+        include: {
+          images: true
+        }
+      }
+    },
   });
 }
 

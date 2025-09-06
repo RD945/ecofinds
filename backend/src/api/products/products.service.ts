@@ -20,6 +20,7 @@ export async function getProducts(category?: string, search?: string) {
           category: true,
           seller: {
               select: {
+                  id: true,
                   username: true,
               }
           },

@@ -78,7 +78,7 @@ export const ProductDetail = () => {
     }
     try {
       await api.post('/cart', { productId: product!.id, quantity: 1 });
-      alert('Product added to cart!');
+      // No notification for add to cart as requested by user
     } catch (error) {
         console.error("Failed to add to cart", error);
         if ((error as any).response?.status === 401) {

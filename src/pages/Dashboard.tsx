@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, User, Package, ShoppingBag, ShieldCheck } from "lucide-react";
+import { ArrowLeft, User, Package, ShoppingBag, ShieldCheck, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,8 @@ import api from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
+import { LocationPicker, DeliveryLocation } from "@/components/LocationPicker";
 
 interface ProductImage {
     id: number;
@@ -45,6 +47,22 @@ export const Dashboard = () => {
   const [userListings, setUserListings] = useState<Product[]>([]);
   const [userPurchases, setUserPurchases] = useState<Order[]>([]);
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<(DeliveryLocation & { id: number })[]>([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
+  const handleAddAddress = (location: DeliveryLocation) => {
+    const addressWithId = { ...location, id: Date.now() };
+    setSavedAddresses(prev => [...prev, addressWithId]);
+    setShowAddressForm(false);
+    toast.success('Address saved successfully!', {
+      description: 'Your new delivery address has been added.'
+    });
+  };
+
+  const handleRemoveAddress = (addressId: number) => {
+    setSavedAddresses(prev => prev.filter(a => a.id !== addressId));
+    toast.success('Address removed successfully!');
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -79,6 +97,32 @@ export const Dashboard = () => {
           console.error("Failed to update 2FA status:", error);
           // Show an error toast
       }
+  };
+
+  const handleSendSuggestions = async () => {
+    try {
+      // Sample suggestions based on available categories
+      const sampleSuggestions = [
+        { title: "Bamboo Toothbrush Set", price: "299", category: "personal care" },
+        { title: "Organic Cotton Tote Bag", price: "399", category: "accessories" },
+        { title: "Solar Phone Charger", price: "1299", category: "electronics" },
+        { title: "Reusable Food Wraps", price: "499", category: "kitchen" },
+      ];
+
+      await api.post('/auth/send-suggestions', {
+        email: user?.email,
+        suggestions: sampleSuggestions,
+      });
+
+      toast.success('Personalized product suggestions sent to your email!', {
+        description: 'Check your inbox for curated product recommendations.'
+      });
+    } catch (error) {
+      console.error("Failed to send suggestions:", error);
+      toast.error('Failed to send suggestions', {
+        description: 'Please try again or check your connection.'
+      });
+    }
   };
 
   const handleEditProduct = (productId: number) => {
@@ -192,7 +236,7 @@ export const Dashboard = () => {
           {/* Main Content */}
           <div className="lg:col-span-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="listings" className="flex items-center gap-2">
                   <Package className="w-4 h-4" />
                   My Listings
@@ -201,7 +245,11 @@ export const Dashboard = () => {
                   <ShoppingBag className="w-4 h-4" />
                   My Purchases
                 </TabsTrigger>
-                 <TabsTrigger value="security" className="flex items-center gap-2">
+                <TabsTrigger value="addresses" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Addresses
+                </TabsTrigger>
+                <TabsTrigger value="security" className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4" />
                   Security
                 </TabsTrigger>
@@ -320,12 +368,104 @@ export const Dashboard = () => {
                 )}
               </TabsContent>
 
+              {/* Delivery Addresses Tab */}
+              <TabsContent value="addresses" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-semibold">Delivery Addresses</h2>
+                    <p className="text-muted-foreground">
+                      Manage your saved delivery locations for faster checkout
+                    </p>
+                  </div>
+                  <Button
+                    className="btn-eco"
+                    onClick={() => setShowAddressForm(true)}
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Add New Address
+                  </Button>
+                </div>
+
+                {showAddressForm ? (
+                  <Card className="card-eco">
+                    <CardHeader>
+                      <CardTitle>Add New Delivery Address</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <LocationPicker 
+                        onLocationSelect={handleAddAddress}
+                      />
+                      <div className="flex gap-3 mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowAddressForm(false)}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {savedAddresses.length === 0 ? (
+                      <Card className="card-eco">
+                        <CardContent className="p-12 text-center">
+                          <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">No saved addresses</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Save your delivery addresses for quick and easy checkout
+                          </p>
+                          <Button
+                            className="btn-eco"
+                            onClick={() => setShowAddressForm(true)}
+                          >
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Add Your First Address
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {savedAddresses.map((address) => (
+                          <Card key={address.id} className="card-eco">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MapPin className="w-4 h-4 text-primary" />
+                                    <h4 className="font-medium">Delivery Address</h4>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-1">
+                                    {address.address}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {address.city}, {address.state} {address.postalCode}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRemoveAddress(address.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+
               {/* Security Tab */}
               <TabsContent value="security" className="space-y-6">
                  <div>
-                    <h2 className="text-2xl font-semibold">Security Settings</h2>
+                    <h2 className="text-2xl font-semibold">Security & Preferences</h2>
                     <p className="text-muted-foreground">
-                        Manage your account's security settings
+                        Manage your account's security settings and communication preferences
                     </p>
                 </div>
                  <Card className="card-eco">
@@ -346,6 +486,21 @@ export const Dashboard = () => {
                                 {isTwoFactorEnabled ? "2FA Enabled" : "2FA Disabled"}
                             </Label>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="card-eco">
+                    <CardHeader>
+                        <CardTitle>Email Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground mb-4">
+                            Get personalized product recommendations based on your interests and recent activity.
+                        </p>
+                        <Button onClick={handleSendSuggestions} className="btn-eco">
+                            <Mail className="w-4 h-4 mr-2" />
+                            Send Product Suggestions
+                        </Button>
                     </CardContent>
                 </Card>
               </TabsContent>

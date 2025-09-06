@@ -60,8 +60,8 @@ export const EditProduct = () => {
     defaultValues: {
         title: "",
         description: "",
-        price: 0,
-        category_id: 0,
+        price: '' as any,
+        category_id: undefined,
         quantity: 1,
         condition: "New",
         brand: "",
@@ -69,6 +69,9 @@ export const EditProduct = () => {
         material: "",
         color: "",
         working_condition: "",
+        dimension_l: '' as any,
+        dimension_w: '' as any,
+        dimension_h: '' as any,
         is_original: false,
         has_manual: false,
     }
@@ -130,13 +133,11 @@ export const EditProduct = () => {
         });
     }
     
-    // Tell the backend which images to keep
-    formData.append('existingImages', JSON.stringify(existingImages.map(img => img.id)));
+    // Append existing images that are being kept
+    existingImages.forEach(img => formData.append('existingImageIds', String(img.id)));
 
     try {
-      await api.put(`/products/${id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.put(`/products/${id}`, formData);
       navigate("/dashboard");
 
     } catch (err: any) {

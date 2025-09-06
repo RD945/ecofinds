@@ -88,12 +88,21 @@ model CartItem {
 }
 
 model Order {
-  id           Int         @id @default(autoincrement())
-  user_id      Int
-  user         User        @relation(fields: [user_id], references: [id])
-  total_amount Decimal     @db.Decimal(10, 2)
-  order_date   DateTime    @default(now())
-  orderItems   OrderItem[]
+  id                     Int         @id @default(autoincrement())
+  user_id                Int
+  user                   User        @relation(fields: [user_id], references: [id])
+  total_amount           Decimal     @db.Decimal(10, 2)
+  order_date             DateTime    @default(now())
+  orderItems             OrderItem[]
+  
+  // Delivery address fields
+  delivery_address       String?
+  delivery_city          String?
+  delivery_state         String?
+  delivery_postal_code   String?
+  delivery_country       String?
+  delivery_latitude      Decimal?    @db.Decimal(10, 7)
+  delivery_longitude     Decimal?    @db.Decimal(10, 7)
 }
 
 model OrderItem {

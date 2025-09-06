@@ -65,10 +65,10 @@ export const AddProduct = () => {
     defaultValues: {
       title: "",
       description: "",
-      price: 0,
-      category_id: 1, // Default to 'kitchen'
+      price: '' as any,
+      category_id: undefined,
       quantity: 1,
-      condition: "Used - Good",
+      condition: "New",
       brand: "",
       model: "",
       material: "",
@@ -76,6 +76,9 @@ export const AddProduct = () => {
       is_original: false,
       has_manual: false,
       working_condition: "",
+      dimension_l: '' as any,
+      dimension_w: '' as any,
+      dimension_h: '' as any,
     },
   });
 
@@ -114,9 +117,7 @@ export const AddProduct = () => {
     }
 
     try {
-      await api.post('/products', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/products', formData);
       navigate("/dashboard");
 
     } catch (err: any) {

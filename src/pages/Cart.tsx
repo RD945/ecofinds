@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { useNavigate } from "react-router-dom";
+import { PaymentConfirmation, PaymentData } from "@/components/PaymentConfirmation";
+import { ImageWithFade } from "@/components/ImageWithFade";
 
 
 interface CartItem {
@@ -14,7 +16,12 @@ interface CartItem {
     id: number;
     title: string;
     price: string;
-    image_url: string | null;
+    images: Array<{
+      id: number;
+      url?: string | null;
+      imageData?: Buffer;
+      mimetype?: string;
+    }>;
   };
 }
 
@@ -22,12 +29,14 @@ export const Cart = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [showPayment, setShowPayment] = useState(false);
 
     useEffect(() => {
         const fetchCartItems = async () => {
             if (user) {
                 try {
                     const { data } = await api.get('/cart');
+                    console.log("Cart data received:", data);
                     setCartItems(data);
                 } catch (error) {
                     console.error("Failed to fetch cart items", error);
@@ -46,14 +55,36 @@ export const Cart = () => {
         }
     };
 
-    const handleCheckout = async () => {
+    const handleCheckout = () => {
+        setShowPayment(true);
+    };
+
+    const handlePaymentConfirm = async (paymentData: PaymentData) => {
         try {
-            await api.post('/orders/checkout');
+            // Process the actual checkout with delivery location
+            await api.post('/orders/checkout', {
+                deliveryLocation: paymentData.deliveryLocation
+            });
+            
+            // Send payment confirmation email
+            await api.post('/auth/send-payment-confirmation', {
+                email: user?.email,
+                orderTotal: total,
+                itemCount: cartItems.length,
+                paymentData: {
+                    cardNumber: paymentData.cardNumber,
+                    cardholderName: paymentData.cardholderName,
+                },
+                deliveryLocation: paymentData.deliveryLocation
+            });
+            
+            setShowPayment(false);
             navigate('/dashboard');
         } catch (error) {
             console.error("Checkout failed", error);
+            throw error;
         }
-    }
+    };
 
   const subtotal = cartItems.reduce((sum, item) => {
     return sum + parseFloat(item.product.price) * item.quantity;
@@ -112,15 +143,26 @@ export const Cart = () => {
                   <CardContent className="p-6">
                     <div className="flex gap-4">
                       {/* Product Image */}
-                      <div className="w-20 h-20 bg-accent rounded-lg flex-shrink-0 flex items-center justify-center">
-                        {item.product.image_url ? (
-                          <img 
-                            src={item.product.image_url} 
+                      <div className="w-20 h-20 bg-accent rounded-lg flex-shrink-0 overflow-hidden">
+                        {item.product.images && item.product.images.length > 0 ? (
+                          <ImageWithFade
+                            src={
+                              item.product.images[0].url || 
+                              `http://localhost:5000/api/images/${item.product.images[0].id}`
+                            } 
                             alt={item.product.title}
-                            className="w-full h-full object-cover rounded-lg"
+                            className="w-full h-full object-cover"
+                            wrapperClassName="w-full h-full"
+                            onError={(e) => {
+                              console.error("Image failed to load:", e);
+                              console.log("Image data:", item.product.images[0]);
+                              console.log("Constructed URL:", item.product.images[0].url || `http://localhost:5000/api/images/${item.product.images[0].id}`);
+                            }}
                           />
                         ) : (
-                          <span className="text-muted-foreground text-sm">No image</span>
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-muted-foreground text-sm">No image</span>
+                          </div>
                         )}
                       </div>
 
@@ -244,6 +286,14 @@ export const Cart = () => {
           </div>
         )}
       </main>
+      
+      <PaymentConfirmation
+        isOpen={showPayment}
+        onClose={() => setShowPayment(false)}
+        onConfirm={handlePaymentConfirm}
+        orderTotal={total}
+        itemCount={cartItems.length}
+      />
     </div>
   );
 };
