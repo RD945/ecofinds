@@ -1,73 +1,83 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { Navigation } from "@/components/Navigation";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import heroImage from "@/assets/hero-image.jpg";
+import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
-// Mock data for demonstration
-const mockProducts = [
-  {
-    id: "1",
-    title: "Bamboo Water Bottle",
-    price: "$25.00",
-    category: "kitchen",
-    image: null,
-  },
-  {
-    id: "2", 
-    title: "Organic Cotton Tote Bag",
-    price: "$18.00",
-    category: "accessories",
-    image: null,
-  },
-  {
-    id: "3",
-    title: "Eco-Friendly Phone Case",
-    price: "$35.00",
-    category: "electronics",
-    image: null,
-  },
-  {
-    id: "4",
-    title: "Sustainable Bamboo Toothbrush Set",
-    price: "$12.00",
-    category: "personal care",
-    image: null,
-  },
-  {
-    id: "5",
-    title: "Reusable Beeswax Food Wraps",
-    price: "$22.00",
-    category: "kitchen",
-    image: null,
-  },
-  {
-    id: "6",
-    title: "Solar-Powered Charger",
-    price: "$45.00",
-    category: "electronics",
-    image: null,
-  },
-];
+
+interface Product {
+  id: number;
+  title: string;
+  price: string;
+  category: { name: string };
+  image_url: string | null;
+}
 
 const categories = ["kitchen", "accessories", "electronics", "personal care", "home", "clothing"];
 
-interface LandingProps {
-  onNavigate: (page: string) => void;
-  currentUser?: any;
-}
-
-export const Landing = ({ onNavigate, currentUser }: LandingProps) => {
+export const Landing = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [cartCount] = useState(2); // Mock cart count
+  const [cartCount, setCartCount] = useState(0); // Mock cart count
 
-  // Filter products based on search and category
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (selectedCategory !== 'all') {
+          params.append('category', selectedCategory);
+        }
+        if (searchQuery) {
+          params.append('search', searchQuery);
+        }
+        const { data } = await api.get(`/products?${params.toString()}`);
+        setProducts(data);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      }
+    };
+    fetchProducts();
+  }, [searchQuery, selectedCategory]);
+
+   useEffect(() => {
+    const fetchCart = async () => {
+      if (user) {
+        try {
+          const { data } = await api.get('/cart');
+          setCartCount(data.reduce((sum: number, item: any) => sum + item.quantity, 0));
+        } catch (error) {
+          console.error("Failed to fetch cart:", error);
+        }
+      } else {
+        setCartCount(0);
+      }
+    };
+    fetchCart();
+  }, [user]);
+
+  const handleAddToCart = async (productId: number) => {
+    try {
+        await api.post('/cart', { productId, quantity: 1});
+        // A toast notification would be better here.
+        alert('Product added to cart!');
+        // Refetch cart to update count
+         if (user) {
+            const { data } = await api.get('/cart');
+            setCartCount(data.reduce((sum: number, item: any) => sum + item.quantity, 0));
+        }
+    } catch (error) {
+        console.error("Failed to add to cart", error);
+    }
+  };
+
+  const filteredProducts = products;
 
   return (
     <div className="min-h-screen bg-background">
@@ -75,8 +85,6 @@ export const Landing = ({ onNavigate, currentUser }: LandingProps) => {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         cartCount={cartCount}
-        onNavigate={onNavigate}
-        currentUser={currentUser}
       />
 
       {/* Hero Section */}
@@ -96,18 +104,18 @@ export const Landing = ({ onNavigate, currentUser }: LandingProps) => {
                   Find unique, sustainable products that make a difference.
                 </p>
                 <div className="flex gap-4">
-                  <button 
+                  <Button 
                     className="btn-eco"
-                    onClick={() => onNavigate('signup')}
+                    onClick={() => navigate('/signup')}
                   >
                     Start Shopping
-                  </button>
-                  <button 
+                  </Button>
+                  <Button 
                     className="btn-eco-outline"
-                    onClick={() => onNavigate('add-product')}
+                    onClick={() => navigate('/add-product')}
                   >
                     Sell Your Items
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className="order-first lg:order-last">
@@ -158,8 +166,12 @@ export const Landing = ({ onNavigate, currentUser }: LandingProps) => {
             {filteredProducts.map((product) => (
               <ProductCard
                 key={product.id}
-                {...product}
-                onClick={() => console.log('Navigate to product', product.id)}
+                id={product.id}
+                title={product.title}
+                price={product.price}
+                category={product.category.name}
+                image={product.image_url}
+                onAddToCart={() => handleAddToCart(product.id)}
               />
             ))}
           </div>

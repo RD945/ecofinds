@@ -1,82 +1,72 @@
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "./ui/card";
+import { useNavigate } from "react-router-dom";
+import { Button } from "./ui/button";
+import { ShoppingCart } from "lucide-react";
+
 
 interface ProductCardProps {
-  id: string;
+  id: number;
   title: string;
   price: string;
   category: string;
-  image?: string;
-  onClick?: () => void;
+  image: string | null;
   showActions?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onAddToCart?: () => void;
 }
 
 export const ProductCard = ({
+  id,
   title,
   price,
   category,
   image,
-  onClick,
-  showActions = false,
+  showActions,
   onEdit,
   onDelete,
+  onAddToCart,
 }: ProductCardProps) => {
+    const navigate = useNavigate();
+
+    const handleCardClick = (e: React.MouseEvent) => {
+        // Prevent navigation when clicking on a button inside the card
+        if ((e.target as HTMLElement).closest('button')) {
+            return;
+        }
+        navigate(`/products/${id}`);
+    }
+
   return (
-    <Card className="card-eco cursor-pointer group" onClick={onClick}>
-      <div className="aspect-[4/3] bg-accent rounded-t-xl overflow-hidden">
-        {image ? (
-          <img
-            src={image}
-            alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-accent to-muted flex items-center justify-center">
-            <div className="text-muted-foreground text-sm">No image</div>
-          </div>
-        )}
-      </div>
-      
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-            {title}
-          </h3>
-          <span className="text-lg font-bold text-primary ml-2 shrink-0">
-            {price}
-          </span>
+    <Card 
+        className="card-eco group cursor-pointer overflow-hidden" 
+        onClick={handleCardClick}
+    >
+        <div className="aspect-[4/3] bg-accent overflow-hidden">
+          <img 
+            src={image || 'https://placehold.co/600x400'} 
+            alt={title} 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            />
         </div>
-        
-        <p className="text-muted-foreground text-sm capitalize mb-3">
-          {category}
-        </p>
-        
-        {showActions && (
-          <div className="flex gap-2 pt-2 border-t border-border">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.();
-              }}
-              className="btn-eco-outline text-xs py-1 px-3 flex-1"
-            >
-              Edit
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.();
-              }}
-              className="text-xs py-1 px-3 border border-destructive text-destructive 
-                       hover:bg-destructive hover:text-destructive-foreground
-                       rounded-lg transition-all duration-200 flex-1"
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
+      <CardContent className="p-4 space-y-2">
+        <p className="text-sm text-muted-foreground capitalize">{category}</p>
+        <h3 className="font-semibold text-lg truncate group-hover:text-primary">{title}</h3>
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-primary text-xl">₹{price}</p>
+          {showActions ? (
+             <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onEdit}>Edit</Button>
+                <Button variant="destructive" size="sm" onClick={onDelete}>Delete</Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={onAddToCart}>
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Add to Cart
+            </Button>
+          )}
+        </div>
+      </CardContent>
     </Card>
   );
 };

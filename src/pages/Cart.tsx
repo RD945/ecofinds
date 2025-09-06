@@ -1,62 +1,65 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/api";
+import { useNavigate } from "react-router-dom";
 
-interface CartProps {
-  onNavigate: (page: string) => void;
+
+interface CartItem {
+  id: number;
+  quantity: number;
+  product: {
+    id: number;
+    title: string;
+    price: string;
+    image_url: string | null;
+  };
 }
 
-// Mock cart data
-const mockCartItems = [
-  {
-    id: "cart-1",
-    title: "Bamboo Water Bottle",
-    price: 25.00,
-    category: "kitchen",
-    quantity: 1,
-    image: null,
-    seller: "EcoStore"
-  },
-  {
-    id: "cart-2",
-    title: "Organic Cotton Tote Bag",
-    price: 18.00,
-    category: "accessories",
-    quantity: 2,
-    image: null,
-    seller: "GreenGoods"
-  },
-];
+export const Cart = () => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-export const Cart = ({ onNavigate }: CartProps) => {
-  const [cartItems, setCartItems] = useState(mockCartItems);
+    useEffect(() => {
+        const fetchCartItems = async () => {
+            if (user) {
+                try {
+                    const { data } = await api.get('/cart');
+                    setCartItems(data);
+                } catch (error) {
+                    console.error("Failed to fetch cart items", error);
+                }
+            }
+        };
+        fetchCartItems();
+    }, [user]);
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity === 0) {
-      removeItem(id);
-      return;
+    const handleRemoveItem = async (productId: number) => {
+        try {
+            await api.delete(`/cart/${productId}`);
+            setCartItems(cartItems.filter(item => item.product.id !== productId));
+        } catch (error) {
+            console.error("Failed to remove item from cart", error);
+        }
+    };
+
+    const handleCheckout = async () => {
+        try {
+            await api.post('/orders/checkout');
+            navigate('/dashboard');
+        } catch (error) {
+            console.error("Checkout failed", error);
+        }
     }
-    setCartItems(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
 
-  const removeItem = (id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 50 ? 0 : 5.99;
-  const total = subtotal + shipping;
-
-  const handleCheckout = () => {
-    console.log("Proceeding to checkout...");
-    // In a real app, would integrate with payment processor
-    alert("Checkout functionality would be implemented with a payment processor like Stripe!");
-  };
+  const subtotal = cartItems.reduce((sum, item) => {
+    return sum + parseFloat(item.product.price) * item.quantity;
+  }, 0);
+  const tax = subtotal * 0.1; // Example 10% tax
+  const total = subtotal + tax;
 
   return (
     <div className="min-h-screen bg-background">
@@ -66,7 +69,7 @@ export const Cart = ({ onNavigate }: CartProps) => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onNavigate("home")}
+            onClick={() => navigate("/")}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -90,7 +93,7 @@ export const Cart = ({ onNavigate }: CartProps) => {
                 </p>
                 <Button
                   className="btn-eco"
-                  onClick={() => onNavigate("home")}
+                  onClick={() => navigate("/")}
                 >
                   Start Shopping
                 </Button>
@@ -110,10 +113,10 @@ export const Cart = ({ onNavigate }: CartProps) => {
                     <div className="flex gap-4">
                       {/* Product Image */}
                       <div className="w-20 h-20 bg-accent rounded-lg flex-shrink-0 flex items-center justify-center">
-                        {item.image ? (
+                        {item.product.image_url ? (
                           <img 
-                            src={item.image} 
-                            alt={item.title}
+                            src={item.product.image_url} 
+                            alt={item.product.title}
                             className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
@@ -124,13 +127,13 @@ export const Cart = ({ onNavigate }: CartProps) => {
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-lg mb-1 truncate">
-                          {item.title}
+                          {item.product.title}
                         </h3>
                         <p className="text-muted-foreground text-sm capitalize mb-1">
-                          {item.category} • by {item.seller}
+                          Quantity: {item.quantity}
                         </p>
                         <p className="text-primary font-semibold">
-                          ${item.price.toFixed(2)} each
+                          ${item.product.price} each
                         </p>
                       </div>
 
@@ -139,7 +142,7 @@ export const Cart = ({ onNavigate }: CartProps) => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => handleRemoveItem(item.product.id)}
                           className="text-muted-foreground hover:text-destructive h-8 w-8"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -149,7 +152,7 @@ export const Cart = ({ onNavigate }: CartProps) => {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => {/* Quantity decrement not implemented */}}
                             className="h-8 w-8"
                           >
                             <Minus className="w-3 h-3" />
@@ -160,16 +163,26 @@ export const Cart = ({ onNavigate }: CartProps) => {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => {/* Quantity increment not implemented */}}
                             className="h-8 w-8"
                           >
                             <Plus className="w-3 h-3" />
                           </Button>
                         </div>
 
-                        <p className="text-lg font-bold text-primary">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </p>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">
+                            ₹{(parseFloat(item.product.price) * item.quantity).toFixed(2)}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveItem(item.product.id)}
+                            className="text-muted-foreground hover:text-destructive h-8 w-8"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -188,31 +201,17 @@ export const Cart = ({ onNavigate }: CartProps) => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>₹{subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Shipping</span>
-                      <span>
-                        {shipping === 0 ? (
-                          <span className="text-success">Free</span>
-                        ) : (
-                          `$${shipping.toFixed(2)}`
-                        )}
-                      </span>
+                      <span>Taxes (10%)</span>
+                      <span>₹{tax.toFixed(2)}</span>
                     </div>
-                    {shipping > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Free shipping on orders over $50
-                      </p>
-                    )}
-                  </div>
-
-                  <hr className="border-border" />
-
-                  {/* Total */}
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-primary">${total.toFixed(2)}</span>
+                    <hr className="border-border" />
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <span>₹{total.toFixed(2)}</span>
+                    </div>
                   </div>
 
                   {/* Checkout Button */}

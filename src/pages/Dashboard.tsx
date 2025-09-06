@@ -1,77 +1,86 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, User, Package, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductCard } from "@/components/ProductCard";
+import { useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/api";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
   currentUser?: any;
 }
 
-// Mock user data
-const mockUserListings = [
-  {
-    id: "user-1",
-    title: "Vintage Bamboo Cutting Board",
-    price: "$35.00",
-    category: "kitchen",
-    image: null,
-  },
-  {
-    id: "user-2",
-    title: "Handmade Organic Soap Set",
-    price: "$24.00",
-    category: "personal care",
-    image: null,
-  },
-  {
-    id: "user-3",
-    title: "Upcycled Denim Jacket",
-    price: "$45.00",
-    category: "clothing",
-    image: null,
-  },
-];
+interface Product {
+  id: number;
+  title: string;
+  price: string;
+  category: { name: string };
+  image_url: string | null;
+  seller_id: number;
+}
 
-const mockUserPurchases = [
-  {
-    id: "purchase-1",
-    title: "Solar Phone Charger",
-    price: "$29.00",
-    category: "electronics",
-    image: null,
-    purchaseDate: "2024-01-15",
-  },
-  {
-    id: "purchase-2",
-    title: "Reusable Silicone Food Bags",
-    price: "$18.00",
-    category: "kitchen",
-    image: null,
-    purchaseDate: "2024-01-10",
-  },
-];
+interface OrderItem {
+    id: number;
+    product: Product;
+    quantity: number;
+    price: string;
+}
 
-export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
+interface Order {
+    id: number;
+    order_date: string;
+    total_amount: string;
+    orderItems: OrderItem[];
+}
+
+export const Dashboard = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("listings");
+  const [userListings, setUserListings] = useState<Product[]>([]);
+  const [userPurchases, setUserPurchases] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (user) {
+        try {
+            const { data: products } = await api.get<Product[]>('/products');
+            setUserListings(products.filter((p: Product) => p.seller_id === user.id));
+
+            const { data: orders } = await api.get('/orders/history');
+            setUserPurchases(orders);
+
+        } catch (error) {
+            console.error("Failed to fetch dashboard data:", error);
+        }
+      }
+    };
+    fetchDashboardData();
+  }, [user]);
+
 
   const handleEditProduct = (productId: string) => {
     console.log("Edit product:", productId);
     // In a real app, would navigate to edit form
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    console.log("Delete product:", productId);
-    // In a real app, would show confirmation and delete
+  const handleDeleteProduct = async (productId: number) => {
+    try {
+        await api.delete(`/products/${productId}`);
+        setUserListings(userListings.filter(p => p.id !== productId));
+    } catch (error) {
+        console.error("Failed to delete product", error);
+    }
   };
 
   const stats = {
-    totalListings: mockUserListings.length,
-    totalPurchases: mockUserPurchases.length,
-    totalEarnings: mockUserListings.reduce((sum, item) => {
-      return sum + parseFloat(item.price.replace('$', ''));
+    totalListings: userListings.length,
+    totalPurchases: userPurchases.length,
+    totalEarnings: userListings.reduce((sum, item) => {
+      return sum + parseFloat(item.price);
     }, 0),
   };
 
@@ -83,7 +92,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onNavigate("home")}
+            onClick={() => navigate("/")}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -94,7 +103,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
             <div>
               <h1 className="text-xl font-semibold">My Dashboard</h1>
               <p className="text-sm text-muted-foreground">
-                Welcome back, {currentUser?.name || "User"}!
+                Welcome back, {user?.username || "User"}!
               </p>
             </div>
           </div>
@@ -111,9 +120,9 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                 <div className="w-20 h-20 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
                   <User className="w-10 h-10 text-primary-foreground" />
                 </div>
-                <h3 className="font-semibold text-lg">{currentUser?.name || "User"}</h3>
+                <h3 className="font-semibold text-lg">{user?.username || "User"}</h3>
                 <p className="text-muted-foreground text-sm mb-4">
-                  {currentUser?.email || "user@example.com"}
+                  {user?.email || "user@example.com"}
                 </p>
                 <Button
                   variant="outline"
@@ -154,7 +163,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                   <div>
                     <p className="text-sm text-muted-foreground">Potential Earnings</p>
                     <p className="text-xl font-bold text-success">
-                      ${stats.totalEarnings.toFixed(2)}
+                      ₹{stats.totalEarnings.toFixed(2)}
                     </p>
                   </div>
                 </CardContent>
@@ -187,13 +196,13 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                   </div>
                   <Button
                     className="btn-eco"
-                    onClick={() => onNavigate("add-product")}
+                    onClick={() => navigate("/add-product")}
                   >
                     Add New Product
                   </Button>
                 </div>
 
-                {mockUserListings.length === 0 ? (
+                {userListings.length === 0 ? (
                   <Card className="card-eco">
                     <CardContent className="p-12 text-center">
                       <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -203,7 +212,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                       </p>
                       <Button
                         className="btn-eco"
-                        onClick={() => onNavigate("add-product")}
+                        onClick={() => navigate("/add-product")}
                       >
                         Create Your First Listing
                       </Button>
@@ -211,12 +220,15 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {mockUserListings.map((product) => (
+                    {userListings.map((product) => (
                       <ProductCard
                         key={product.id}
-                        {...product}
+                        title={product.title}
+                        price={product.price}
+                        category={product.category.name}
+                        image={product.image_url}
                         showActions={true}
-                        onEdit={() => handleEditProduct(product.id)}
+                        onEdit={() => handleEditProduct(String(product.id))}
                         onDelete={() => handleDeleteProduct(product.id)}
                         onClick={() => console.log("View product", product.id)}
                       />
@@ -234,7 +246,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                   </p>
                 </div>
 
-                {mockUserPurchases.length === 0 ? (
+                {userPurchases.length === 0 ? (
                   <Card className="card-eco">
                     <CardContent className="p-12 text-center">
                       <ShoppingBag className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -244,7 +256,7 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                       </p>
                       <Button
                         className="btn-eco"
-                        onClick={() => onNavigate("home")}
+                        onClick={() => navigate("/")}
                       >
                         Start Shopping
                       </Button>
@@ -252,23 +264,23 @@ export const Dashboard = ({ onNavigate, currentUser }: DashboardProps) => {
                   </Card>
                 ) : (
                   <div className="space-y-4">
-                    {mockUserPurchases.map((purchase) => (
+                    {userPurchases.map((purchase) => (
                       <Card key={purchase.id} className="card-eco">
                         <CardContent className="p-6">
                           <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-accent rounded-lg flex-shrink-0"></div>
                             <div className="flex-1">
-                              <h3 className="font-semibold">{purchase.title}</h3>
+                              <h3 className="font-semibold">{purchase.orderItems.map(i => i.product.title).join(', ')}</h3>
                               <p className="text-sm text-muted-foreground capitalize">
-                                {purchase.category}
+                                {purchase.orderItems.length} items
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                Purchased on {new Date(purchase.purchaseDate).toLocaleDateString()}
+                                Purchased on {new Date(purchase.order_date).toLocaleDateString()}
                               </p>
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-bold text-primary">
-                                {purchase.price}
+                                ₹{purchase.total_amount}
                               </p>
                               <Button
                                 variant="outline"

@@ -1,110 +1,53 @@
-import { useState } from "react";
-import { ArrowLeft, Upload, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft } from "lucide-react";
+import api from "@/lib/api";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-interface AddProductProps {
-  onNavigate: (page: string) => void;
-  onProductAdded?: (product: any) => void;
-}
 
+const formSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  price: z.coerce.number().positive("Price must be a positive number"),
+  category_id: z.coerce.number().int().positive("Category is required"),
+});
+
+// A real app would fetch these from the DB
 const categories = [
-  "kitchen",
-  "accessories", 
-  "electronics",
-  "personal care",
-  "home",
-  "clothing",
-  "books",
-  "toys",
-  "garden",
-  "other"
+    { id: 1, name: 'kitchen' },
+    { id: 2, name: 'accessories' },
+    { id: 3, name: 'electronics' },
+    { id: 4, name: 'personal care' },
+    { id: 5, name: 'home' },
+    { id: 6, name: 'clothing' }
 ];
 
-export const AddProduct = ({ onNavigate, onProductAdded }: AddProductProps) => {
-  const [formData, setFormData] = useState({
-    title: "",
-    category: "",
-    description: "",
-    price: "",
-    condition: "new",
+export const AddProduct = () => {
+    const navigate = useNavigate();
+    const [error, setError] = useState<string | null>(null);
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
   });
-  const [images, setImages] = useState<string[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setError(null);
+    try {
+        await api.post('/products', values);
+        navigate("/dashboard");
+    } catch (err: any) {
+        setError(err.response?.data?.message || "An error occurred.");
     }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    // Mock image upload - in real app would upload to server
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          setImages(prev => [...prev, e.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = "Product title is required";
-    }
-    if (!formData.category) {
-      newErrors.category = "Please select a category";
-    }
-    if (!formData.description.trim()) {
-      newErrors.description = "Product description is required";
-    }
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      newErrors.price = "Please enter a valid price";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-
-    // Mock API call
-    setTimeout(() => {
-      const newProduct = {
-        id: Date.now().toString(),
-        ...formData,
-        price: `$${parseFloat(formData.price).toFixed(2)}`,
-        images,
-        createdAt: new Date().toISOString(),
-      };
-
-      onProductAdded?.(newProduct);
-      setIsSubmitting(false);
-      onNavigate("dashboard");
-    }, 1000);
   };
 
   return (
@@ -115,7 +58,7 @@ export const AddProduct = ({ onNavigate, onProductAdded }: AddProductProps) => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onNavigate("home")}
+            onClick={() => navigate(-1)}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -123,167 +66,109 @@ export const AddProduct = ({ onNavigate, onProductAdded }: AddProductProps) => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <Card className="card-eco">
+      <main className="container mx-auto px-4 py-8">
+        <Card className="max-w-3xl mx-auto card-eco">
           <CardHeader>
-            <CardTitle>Add New Product</CardTitle>
-            <p className="text-muted-foreground">
-              Share your eco-friendly items with our community
-            </p>
+            <CardTitle>Add a New Product</CardTitle>
+            <CardDescription>
+              Fill out the details below to list your eco-friendly item.
+            </CardDescription>
           </CardHeader>
-
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Product Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Product Title *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange("title", e.target.value)}
-                  className={`input-eco ${errors.title ? "border-destructive" : ""}`}
-                  placeholder="e.g., Bamboo Water Bottle"
-                />
-                {errors.title && (
-                  <p className="text-destructive text-sm">{errors.title}</p>
-                )}
-              </div>
-
-              {/* Category */}
-              <div className="space-y-2">
-                <Label>Category *</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => handleInputChange("category", value)}
-                >
-                  <SelectTrigger className={`input-eco ${errors.category ? "border-destructive" : ""}`}>
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.category && (
-                  <p className="text-destructive text-sm">{errors.category}</p>
-                )}
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
-                  className={`input-eco min-h-24 ${errors.description ? "border-destructive" : ""}`}
-                  placeholder="Describe your item, its condition, and why it's eco-friendly..."
-                />
-                {errors.description && (
-                  <p className="text-destructive text-sm">{errors.description}</p>
-                )}
-              </div>
-
-              {/* Price and Condition */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price ($) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => handleInputChange("price", e.target.value)}
-                    className={`input-eco ${errors.price ? "border-destructive" : ""}`}
-                    placeholder="0.00"
-                  />
-                  {errors.price && (
-                    <p className="text-destructive text-sm">{errors.price}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Condition</Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value) => handleInputChange("condition", value)}
-                  >
-                    <SelectTrigger className="input-eco">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="like-new">Like New</SelectItem>
-                      <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="fair">Fair</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-4">
-                <Label>Product Images</Label>
-                
-                {/* Upload Button */}
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label htmlFor="image-upload" className="cursor-pointer">
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">
-                      Click to upload images or drag and drop
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      PNG, JPG up to 10MB each
-                    </p>
-                  </label>
-                </div>
-
-                {/* Image Preview */}
-                {images.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {images.map((image, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={image}
-                          alt={`Product ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg border border-border"
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Title</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Bamboo Toothbrush Set"
+                          {...field}
+                          className="input-eco"
                         />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground 
-                                   rounded-full w-6 h-6 flex items-center justify-center opacity-0 
-                                   group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn-eco w-full"
-              >
-                {isSubmitting ? "Creating Listing..." : "Submit Listing"}
-              </Button>
-            </form>
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe your product's features and eco-friendly benefits."
+                          {...field}
+                          className="input-eco"
+                          rows={5}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                 <FormField
+                  control={form.control}
+                  name="category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                        <select {...field} className="input-eco w-full">
+                            <option value="">Select a category</option>
+                            {categories.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 12.99"
+                          {...field}
+                          className="input-eco"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* A real app would have image uploads here */}
+
+                {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+                <div className="flex justify-end gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/dashboard")}
+                    className="btn-eco-outline"
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="btn-eco">
+                    List Product
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </main>
